@@ -1,33 +1,12 @@
 import Foundation
 
-struct OAuthTokenResponseBody: Decodable {
-    let accessToken: String
-    
-    enum CodingKeys: String, CodingKey {
-        case accessToken = "access_token"
-    }
-}
-
-final class OAuth2TokenStorage {
-    private let tokenKey = "Bearer Token"
-    
-    var token: String? {
-        get {
-            return UserDefaults.standard.string(forKey: tokenKey)
-        }
-        set {
-            UserDefaults.standard.setValue(newValue, forKey: tokenKey)
-        }
-    }
-}
-
  final class OAuth2Service {
     
     static let shared = OAuth2Service()
     private init() {}
     private let tokenStorage = OAuth2TokenStorage()
     
-    func makeOAuthTokenRequest(code: String) -> URLRequest? {
+    private func makeOAuthTokenRequest(code: String) -> URLRequest? {
         guard let baseURL = URL(string: "https://unsplash.com") else {
             print ("Ошибка создания URL")
             return nil
@@ -75,4 +54,24 @@ final class OAuth2TokenStorage {
     }
 }
 
+final class OAuth2TokenStorage {
+    private let tokenKey = "Bearer Token"
+    
+    var token: String? {
+        get {
+            return UserDefaults.standard.string(forKey: tokenKey)
+        }
+        set {
+            UserDefaults.standard.setValue(newValue, forKey: tokenKey)
+        }
+    }
+}
+
+struct OAuthTokenResponseBody: Decodable {
+    let accessToken: String
+    
+    enum CodingKeys: String, CodingKey {
+        case accessToken = "access_token"
+    }
+}
 
