@@ -18,6 +18,7 @@ extension URLSession {
             }
         }
         
+        
         let task = dataTask(with: request, completionHandler: { data, response, error in
             if let data = data, let response = response, let statusCode = (response as? HTTPURLResponse)?.statusCode {
                 if 200 ..< 300 ~= statusCode {
@@ -34,4 +35,26 @@ extension URLSession {
         
         return task
     }
+    func objectTask<T: Decodable>(
+           for request: URLRequest,
+           completion: @escaping (Result<T, Error>) -> Void
+       ) -> URLSessionTask {
+           let decoder = JSONDecoder()
+           let task = data(for: request) { (result: Result<Data, Error>) in
+               switch result {
+               case .success(let data):
+                   do {
+                       let response = try JSONDecoder().decode(T.self, from: data)
+                       completion(.success(response))
+                   } catch {
+                       print("Ошибка декодинга: \(error), данные: \(String(data: data, encoding: .utf8) ?? "нет")")
+                       completion(.failure(error))
+                   }
+               case .failure(let error):
+                   print("Ошибка загрузки: \(error)")
+                   completion(.failure(error))
+               }
+           }
+           return task
+       }
 }

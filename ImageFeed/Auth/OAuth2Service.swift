@@ -1,10 +1,18 @@
 import Foundation
+import SwiftKeychainWrapper
 
- final class OAuth2Service {
+enum AuthServiceError: Error {
+    case invalidRequest
+}
+
+final class OAuth2Service {
     
     static let shared = OAuth2Service()
     private init() {}
     private let tokenStorage = OAuth2TokenStorage()
+    
+    private var task: URLSessionTask?
+    private var lastCode: String?
     
     private func makeOAuthTokenRequest(code: String) -> URLRequest? {
         guard let baseURL = URL(string: "https://unsplash.com") else {
@@ -29,22 +37,26 @@ import Foundation
     }
     
     func fetchOAuthToken (_ code: String, completion: @escaping (Result<String, Error>) -> Void) {
-        guard let request = makeOAuthTokenRequest (code: code) else {
-            completion(.failure(NetworkError.urlSessionError))
+        assert(Thread.isMainThread)
+        
+        guard lastCode != code else {
+            completion(.failure(AuthServiceError.invalidRequest))
             return
         }
         
-        let task = URLSession.shared.data(for: request) { [weak self] result in
+        task?.cancel()
+        lastCode = code
+        
+        guard let request = makeOAuthTokenRequest(code: code) else {
+            completion(.failure(AuthServiceError.invalidRequest))
+            return
+        }
+        
+        let task = URLSession.shared.objectTask(for: request) { [weak self] (result: Result<OAuthTokenResponseBody, Error>) in
             switch result {
             case .success (let data):
-                do {
-                    let response = try JSONDecoder().decode(OAuthTokenResponseBody.self, from: data)
-                    self?.tokenStorage.token = response.accessToken
-                    completion(.success(response.accessToken))
-                } catch {
-                    print ("Ошибка, которую может выкинуть декодер при получении OAuthTokenResponseBody: \(error)")
-                    completion(.failure(error))
-                }
+                    self?.tokenStorage.token = data.accessToken
+                    completion(.success(data.accessToken))
             case .failure (let error):
                 print ("Сетевая ошибка: \(error)")
                 completion(.failure(error))
@@ -59,10 +71,12 @@ final class OAuth2TokenStorage {
     
     var token: String? {
         get {
-            return UserDefaults.standard.string(forKey: tokenKey)
+            return KeychainWrapper.standard.string(forKey: tokenKey)
         }
         set {
-            UserDefaults.standard.setValue(newValue, forKey: tokenKey)
+            guard let newValue = newValue else {return}
+            let isSuccess = KeychainWrapper.standard.set(newValue, forKey: tokenKey)
+            guard isSuccess else { fatalError() }
         }
     }
 }
